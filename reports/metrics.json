@@ -1,0 +1,22 @@
+{
+  "roc_auc_cv": 0.8957,
+  "roc_auc_test": 0.9265,
+  "precision": 0.8171,
+  "recall": 0.8437,
+  "f1": 0.8302,
+  "threshold": 0.5,
+  "champion_deployed": "xgboost",
+  "best_params": {
+    "model__learning_rate": 0.05,
+    "model__max_depth": 3,
+    "model__n_estimators": 200,
+    "model__subsample": 0.9
+  },
+  "n_test": 745,
+  "churn_rate_test": 0.455,
+  "baseline_logistic_regression": {
+    "roc_auc_cv": 0.8951,
+    "roc_auc_test": 0.9319
+  },
+  "gain_vs_baseline_test": -0.0054
+}

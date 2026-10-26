@@ -1,0 +1,66 @@
+# ============================================================================
+#  Configuration centrale du pipeline E-commerce Churn
+#  Tout paramètre métier ou technique se règle ici — jamais dans le code.
+# ============================================================================
+
+project:
+  name: "ecommerce-churn-pipeline"
+  version: "1.0.0"
+  random_state: 42          # graine unique -> reproductibilité totale
+
+paths:
+  raw:        "data/raw/online_retail.csv"
+  interim:    "data/interim/transactions_clean.parquet"
+  features:   "data/processed/customer_features.parquet"
+  model:      "models/churn_model.joblib"
+  metrics:    "reports/metrics.json"
+  figures:    "reports/figures"
+
+# --- Source des données -------------------------------------------------------
+# mode: "kagglehub" -> télécharge le vrai dataset Kaggle (carrie1/ecommerce-data)
+#                      puis le copie dans paths.raw. Nécessite un accès internet.
+#       "local"     -> utilise directement le fichier paths.raw (CSV déjà présent,
+#                      vrai jeu ou jeu synthétique de src/generate_sample_data.py).
+# En mode kagglehub, si le téléchargement échoue (pas de réseau), le pipeline
+# se replie automatiquement sur le fichier local s'il existe.
+data_source:
+  mode: "local"
+  kaggle_dataset: "carrie1/ecommerce-data"
+
+# --- Étape 1 : nettoyage -----------------------------------------------------
+cleaning:
+  drop_missing_customer: true     # une vente sans client = inexploitable pour le churn
+  drop_cancellations: true        # factures commençant par 'C' = annulations
+  min_unit_price: 0.0             # on retire les prix <= 0 (dons, erreurs)
+  min_quantity: 1                 # on retire les quantités <= 0
+
+# --- Étape 2 : fenêtrage temporel & définition du churn ----------------------
+# Principe : on coupe l'historique en deux.
+#   [début ................ snapshot] -> on construit les FEATURES
+#   [snapshot ... snapshot+horizon]   -> on observe si le client REVIENT
+# Un client qui n'achète pas dans la fenêtre d'observation est "churné" (1).
+churn:
+  observation_horizon_days: 90    # fenêtre future d'observation du retour client
+  snapshot_offset_days: 90        # snapshot = date_max_du_jeu - horizon
+
+# --- Étape 3 : modélisation --------------------------------------------------
+model:
+  algorithm: "xgboost"            # "xgboost" ou "random_forest"
+  test_size: 0.25
+  cv_folds: 5
+  # Grille d'hyperparamètres (recherche légère et honnête)
+  xgboost:
+    n_estimators: [200, 400]
+    max_depth: [3, 5]
+    learning_rate: [0.05, 0.1]
+    subsample: [0.9]
+  random_forest:
+    n_estimators: [300]
+    max_depth: [8, 12, null]
+    min_samples_leaf: [1, 5]
+
+# --- Étape 4 : décision métier ----------------------------------------------
+business:
+  # Seuil de probabilité au-dessus duquel on déclenche une action de rétention.
+  # Réglable selon le coût d'une campagne vs. la valeur d'un client perdu.
+  alert_threshold: 0.50
